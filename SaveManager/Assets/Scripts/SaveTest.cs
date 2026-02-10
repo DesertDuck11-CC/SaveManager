@@ -2,26 +2,38 @@ using UnityEngine;
 
 public class SaveTest : MonoBehaviour
 {
-    SaveData playerData = new SaveData();
+    public string playerName;
+    public float health;
+    public Vector3 position = Vector3.one;
 
-    [SerializeField] int playerHealth = 0;
-    [SerializeField] string playerName = "";
-
-    int newHealth;
-
-    void Start()
+    private void Start()
     {
-        playerData.AddData(playerHealth, nameof(playerHealth));
-        playerData.AddData(playerName, nameof(playerName));
-        
-        SaveManager.SaveData(playerData, "PlayerSave");
+        SaveData saveData = new SaveData();
 
-        playerHealth = 12;
+        saveData.playerName = playerName;
+        saveData.health = health;
+        saveData.position = position;
 
-        SaveManager.PrintData(playerData);
+        Debug.Log(saveData.playerName);
+        Debug.Log(saveData.health);
+        Debug.Log(saveData.position);
 
-        //newHealth = SaveManager.GetVar<int>(playerData, nameof(playerHealth));
+        SaveManager.Save("SaveData", saveData);
 
-        newHealth = SaveManager.GetVar<int>(playerData, nameof(playerHealth));
+        SaveManager.dataList.Clear();
+
+        SaveData newData = SaveManager.Load<SaveData>("SaveData");
+
+        Debug.Log(newData.playerName);
+        Debug.Log(newData.health);
+        Debug.Log(newData.position);
+    }
+
+    [System.Serializable]
+    private struct SaveData
+    {
+        public string playerName; 
+        public float health;
+        public Vector3 position;
     }
 }

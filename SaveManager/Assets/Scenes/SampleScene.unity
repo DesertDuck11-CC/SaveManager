@@ -148,8 +148,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 417b50c7cf0f9354cba740961daffb4f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SaveTest
-  playerHealth: 10
-  playerName: test
+  playerName: Test
+  health: 100
 --- !u!4 &190496272
 Transform:
   m_ObjectHideFlags: 0
