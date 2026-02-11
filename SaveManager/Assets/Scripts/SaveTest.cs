@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class SaveTest : MonoBehaviour
 {
@@ -21,7 +22,7 @@ public class SaveTest : MonoBehaviour
 
         // Save the data
         SaveManager.Save("SaveData", saveData);
-        SaveManager.Save("name", name);
+        SaveManager.Save("health", health);
 
         // Show Overwrite logic/warning
         SaveManager.Save("SaveData", saveData);

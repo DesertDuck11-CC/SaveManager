@@ -19,15 +19,15 @@ public static class SaveManager
     {
         if (data == null)
         {
-            Debug.LogError("ERROR: Data is set to null");
+            Debug.LogError($"ERROR: {data} is set to null");
             return;
         }
 
         if (dataList.ContainsKey(key))
         {
-            Debug.LogWarning("Warning: Key has already been used");
+            Debug.LogWarning($"Warning: Key: {key} has already been used. Overwriting data");
         }
-
+        
         dataList[key] = data;
 
         WriteToFile();
@@ -45,7 +45,7 @@ public static class SaveManager
             return JsonUtility.FromJson<T>((string)json);
         }
         
-        Debug.LogError("ERROR: Variable not found");            
+        Debug.LogError($"ERROR: Variable not found for {key}");            
         return default;
     }   
 
@@ -56,7 +56,7 @@ public static class SaveManager
         foreach (var pair in dataList)
         {
             saveData.keys.Add(pair.Key);
-            saveData.values.Add(JsonUtility.ToJson(pair.Value));
+            saveData.values.Add(pair.Value.ToString());
         }
 
         string json = JsonUtility.ToJson(saveData, true);
