@@ -8,6 +8,7 @@ public class SaveTest : MonoBehaviour
 
     private void Start()
     {
+        // Create some data to save
         SaveData saveData = new SaveData();
 
         saveData.playerName = playerName;
@@ -18,10 +19,17 @@ public class SaveTest : MonoBehaviour
         Debug.Log(saveData.health);
         Debug.Log(saveData.position);
 
+        // Save the data
+        SaveManager.Save("SaveData", saveData);
+        SaveManager.Save("name", name);
+
+        // Show Overwrite logic/warning
         SaveManager.Save("SaveData", saveData);
 
+        // Clear the data for testing purposes
         SaveManager.dataList.Clear();
 
+        // Create new empty data then give it information based on the saved data
         SaveData newData = SaveManager.Load<SaveData>("SaveData");
 
         Debug.Log(newData.playerName);
