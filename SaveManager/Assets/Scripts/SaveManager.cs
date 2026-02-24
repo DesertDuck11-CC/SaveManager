@@ -1,17 +1,19 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.IO;
+using System;
 
-[System.Serializable]
-public class SaveData
+public enum SaveType
 {
-    public List<string> keys = new();
-    public List<string> values = new();
+    JSON,
+    BINARY
 }
 
 public static class SaveManager
 {
-    private static string saveFilePath = Path.Combine(Application.persistentDataPath, "save.json");
+    private static SaveType _type;
+
+    private static string saveFilePath = Path.Combine(Application.persistentDataPath, "save.txt");  
 
     public static Dictionary<string, object> dataList = new Dictionary<string, object>();
 
@@ -40,27 +42,37 @@ public static class SaveManager
             ReadFile();
         }
 
-        if (dataList.TryGetValue(key, out var json))
+        if (dataList.TryGetValue(key, out var value))
         {
-            return JsonUtility.FromJson<T>((string)json);
+            if(value is T typedValue)
+            {
+                return typedValue;
+            }       
         }
         
-        Debug.LogError($"ERROR: Variable not found for {key}");            
+        Debug.LogError($"ERROR: Variable not found for {key}");
         return default;
     }   
 
     private static void WriteToFile()
     {
-        SaveData saveData = new SaveData();
-
-        foreach (var pair in dataList)
+        using (FileStream fileStream = new(saveFilePath, FileMode.Create))
+        using (BinaryWriter writer = new(fileStream))
         {
-            saveData.keys.Add(pair.Key);
-            saveData.values.Add(pair.Value.ToString());
-        }
+            writer.Write(dataList.Count);
 
-        string json = JsonUtility.ToJson(saveData, true);
-        File.WriteAllText(saveFilePath, json);
+            foreach (var pair in dataList)
+            {
+                writer.Write(pair.Key);
+
+                Type type = pair.Value.GetType();
+                writer.Write(type.AssemblyQualifiedName);
+
+                byte[] bytes = SerializeToBytes(pair.Value);
+                writer.Write(bytes.Length);
+                writer.Write(bytes);
+            }
+        }            
     }
 
     private static void ReadFile()
@@ -70,19 +82,56 @@ public static class SaveManager
             return;
         }
 
-        string json = File.ReadAllText(saveFilePath);
-        SaveData saveData = JsonUtility.FromJson<SaveData>(json);
-
         dataList.Clear();
 
-        for (int i = 0; i < saveData.keys.Count; i++)
+        using (FileStream fileStream = new(saveFilePath, FileMode.Open))
+        using (BinaryReader reader = new(fileStream))
         {
-            dataList.Add(saveData.keys[i], saveData.values[i]);
+            int count = reader.ReadInt32();
+
+            for (int i = 0; i < count; i++)
+            {
+                string key = reader.ReadString();
+                string typeName = reader.ReadString();
+
+                int length = reader.ReadInt32();
+                byte[] bytes = reader.ReadBytes(length);
+
+                Type type = Type.GetType(typeName);
+                object obj = DeserializeFromBytes(bytes, type);
+
+                dataList.Add(key, obj);
+            }
+        }       
+    }
+
+    private static byte[] SerializeToBytes(object obj)
+    {
+        if(obj.GetType().IsPrimitive || obj is string)
+        {
+            return System.Text.Encoding.UTF8.GetBytes(obj.ToString());
         }
+        string json = JsonUtility.ToJson(obj);
+        return System.Text.Encoding.UTF8.GetBytes(json);
+    }
+
+    private static object DeserializeFromBytes(byte[] data, Type type)
+    {
+        string str = System.Text.Encoding.UTF8.GetString(data);
+        if (type.IsPrimitive || type == typeof(string))
+        {
+            return Convert.ChangeType(str, type);
+        }
+        return JsonUtility.FromJson(str, type);
     }
 
     public static void SetFilePath(string filePath)
     {
         saveFilePath = filePath;
+    }
+
+    public static void SetSaveType(SaveType type)
+    {
+        _type = type;
     }
 }

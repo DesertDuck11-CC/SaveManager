@@ -22,10 +22,13 @@ public class SaveTest : MonoBehaviour
 
         // Save the data
         SaveManager.Save("SaveData", saveData);
+
+        health = 20;
+
         SaveManager.Save("health", health);
 
         // Show Overwrite logic/warning
-        SaveManager.Save("SaveData", saveData);
+        //SaveManager.Save("SaveData", saveData);
 
         // Clear the data for testing purposes
         SaveManager.dataList.Clear();
@@ -33,9 +36,13 @@ public class SaveTest : MonoBehaviour
         // Create new empty data then give it information based on the saved data
         SaveData newData = SaveManager.Load<SaveData>("SaveData");
 
+        int newHealth = (int)SaveManager.Load<float>("health");
+
         Debug.Log(newData.playerName);
         Debug.Log(newData.health);
         Debug.Log(newData.position);
+
+        Debug.Log(newHealth);
     }
 
     [System.Serializable]
