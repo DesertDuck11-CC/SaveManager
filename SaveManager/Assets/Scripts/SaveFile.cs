@@ -1,9 +1,12 @@
+using System.Collections.Generic;
 using System.IO;
 
 public class SaveFile
 {
     private string fileName;
     private string filePath;
+
+    private Dictionary<string, object> dataList = new Dictionary<string, object>();
 
     public SaveFile(string fileName, string filePath)
     {
@@ -19,7 +22,7 @@ public class SaveFile
                 break;
         }
 
-        this.filePath = Path.Combine(filePath, fileName);
+        this.filePath = Path.Combine(filePath, this.fileName);
     }
 
     public string getName()
@@ -30,5 +33,10 @@ public class SaveFile
     public string getFilePath()
     {
         return filePath;
+    }
+
+    public Dictionary<string, object> getDataList()
+    {
+        return dataList;
     }
 }

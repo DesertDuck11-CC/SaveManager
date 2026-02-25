@@ -1,7 +1,8 @@
-using UnityEngine;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System;
+using UnityEngine;
+using static UnityEngine.Analytics.IAnalytic;
 
 public enum SaveType
 {
@@ -13,9 +14,7 @@ public static class SaveManager
 {
     private static SaveType saveType = SaveType.BINARY;
 
-    private static string saveFilePath = Application.persistentDataPath; 
-
-    public static Dictionary<string, object> dataList = new Dictionary<string, object>();
+    private static string saveFilePath = Application.persistentDataPath;
 
     public static List<SaveFile> files = new List<SaveFile>();
     public static SaveFile activeFile = null;
@@ -30,7 +29,10 @@ public static class SaveManager
 
     private static void OnQuit()
     {
-        WriteToFile();
+        foreach (var file in files)
+        {
+            WriteToFile(file);
+        }
     }
 
     #endregion
@@ -51,12 +53,15 @@ public static class SaveManager
             return;
         }
 
-        if (dataList.ContainsKey(key))
+        Debug.Log(activeFile.getName());
+        Debug.Log(key);
+
+        if (activeFile.getDataList().ContainsKey(key))
         {
             Debug.LogWarning($"Warning: Key: {key} has already been used. Overwriting data");
         }
-        
-        dataList[key] = data;
+
+        activeFile.getDataList()[key] = data;
     }
 
     public static T Load<T>(string key)
@@ -67,12 +72,12 @@ public static class SaveManager
             return default;
         }
 
-        if (dataList.Count == 0)
+        if (activeFile.getDataList().Count == 0)
         {
             ReadFile();
         }
 
-        if (dataList.TryGetValue(key, out var value))
+        if (activeFile.getDataList().TryGetValue(key, out var value))
         {
             if(value is T typedValue)
             {
@@ -102,27 +107,25 @@ public static class SaveManager
         if (!files.Contains(file))
         {
             files.Add(file);
-        }
-
-        
+        }        
 
         activeFile = file;
     }
 
-    private static void WriteToFile()
+    private static void WriteToFile(SaveFile file)
     {
-        if (!File.Exists(activeFile.getFilePath()))
+        if (file == null)
         {
-            Debug.Log("ERROR: No file set to write to");
+            Debug.Log("ERROR: File does not exist");
             return;
         }
 
-        using (FileStream fileStream = new(activeFile.getFilePath(), FileMode.Create))
+        using (FileStream fileStream = new(file.getFilePath(), FileMode.Create))
         using (BinaryWriter writer = new(fileStream))
         {
-            writer.Write(dataList.Count);
+            writer.Write(file.getDataList().Count);
 
-            foreach (var pair in dataList)
+            foreach (var pair in file.getDataList())
             {
                 writer.Write(pair.Key);
 
@@ -144,7 +147,7 @@ public static class SaveManager
             return;
         }
 
-        dataList.Clear();
+        activeFile.getDataList().Clear();
 
         using (FileStream fileStream = new(activeFile.getFilePath(), FileMode.Open))
         using (BinaryReader reader = new(fileStream))
@@ -162,7 +165,7 @@ public static class SaveManager
                 Type type = Type.GetType(typeName);
                 object obj = DeserializeFromBytes(bytes, type);
 
-                dataList.Add(key, obj);
+                activeFile.getDataList().Add(key, obj);
             }
         }       
     }
@@ -213,14 +216,14 @@ public static class SaveManager
     // Debug Tool Functions
     public static void PrintData(string key)
     {
-        if(dataList.Count == 0)
+        if(activeFile.getDataList().Count == 0)
         {
             ReadFile();
         }
 
-        if(dataList.ContainsKey(key))
+        if(activeFile.getDataList().ContainsKey(key))
         {
-            Debug.Log(dataList[key]);
+            Debug.Log($"Key: {key} Data: {activeFile.getDataList()[key]}");
         }
         else
         {
@@ -230,7 +233,7 @@ public static class SaveManager
 
     public static void PrintKeys()
     {
-        foreach(var pair in dataList)
+        foreach(var pair in activeFile.getDataList())
         {
             Debug.Log(pair.Key);
         }
@@ -238,7 +241,7 @@ public static class SaveManager
 
     public static bool CheckKey(string key)
     {
-        return dataList.ContainsKey(key);
+        return activeFile.getDataList().ContainsKey(key);
     }
 
     public static SaveType getSaveType()
