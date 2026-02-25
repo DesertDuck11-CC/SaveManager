@@ -11,14 +11,40 @@ public enum SaveType
 
 public static class SaveManager
 {
-    private static SaveType _type;
+    private static SaveType saveType = SaveType.BINARY;
 
-    private static string saveFilePath = Path.Combine(Application.persistentDataPath, "save.txt");  
+    private static string saveFilePath = Application.persistentDataPath; 
 
     public static Dictionary<string, object> dataList = new Dictionary<string, object>();
 
+    public static List<SaveFile> files = new List<SaveFile>();
+    public static SaveFile activeFile = null;
+
+    #region File Write On Quit
+
+    [RuntimeInitializeOnLoadMethod]
+    private static void Init()
+    {
+        Application.quitting += OnQuit;
+    }
+
+    private static void OnQuit()
+    {
+        WriteToFile();
+    }
+
+    #endregion
+
+    #region Data Functions
+
     public static void Save<T>(string key, T data)
     {
+        if(activeFile == null)
+        {
+            Debug.LogError($"ERROR: There is no active file");
+            return;
+        }
+
         if (data == null)
         {
             Debug.LogError($"ERROR: {data} is set to null");
@@ -31,13 +57,17 @@ public static class SaveManager
         }
         
         dataList[key] = data;
-
-        WriteToFile();
     }
 
     public static T Load<T>(string key)
     {
-        if(dataList.Count == 0)
+        if (activeFile == null)
+        {
+            Debug.LogError($"ERROR: There is no active file");
+            return default;
+        }
+
+        if (dataList.Count == 0)
         {
             ReadFile();
         }
@@ -52,11 +82,42 @@ public static class SaveManager
         
         Debug.LogError($"ERROR: Variable not found for {key}");
         return default;
-    }   
+    }
+
+    #endregion
+
+    #region File Functions
+
+    public static SaveFile CreateFile(string fileName)
+    {
+        SaveFile file = new SaveFile(fileName, saveFilePath);
+
+        files.Add(file);
+
+        return file;
+    }
+
+    public static void SetFile(SaveFile file)
+    {
+        if (!files.Contains(file))
+        {
+            files.Add(file);
+        }
+
+        
+
+        activeFile = file;
+    }
 
     private static void WriteToFile()
     {
-        using (FileStream fileStream = new(saveFilePath, FileMode.Create))
+        if (!File.Exists(activeFile.getFilePath()))
+        {
+            Debug.Log("ERROR: No file set to write to");
+            return;
+        }
+
+        using (FileStream fileStream = new(activeFile.getFilePath(), FileMode.Create))
         using (BinaryWriter writer = new(fileStream))
         {
             writer.Write(dataList.Count);
@@ -77,14 +138,15 @@ public static class SaveManager
 
     private static void ReadFile()
     {
-        if (!File.Exists(saveFilePath))
+        if (!File.Exists(activeFile.getFilePath()))
         {
+            Debug.Log("ERROR: No file set to read from");
             return;
         }
 
         dataList.Clear();
 
-        using (FileStream fileStream = new(saveFilePath, FileMode.Open))
+        using (FileStream fileStream = new(activeFile.getFilePath(), FileMode.Open))
         using (BinaryReader reader = new(fileStream))
         {
             int count = reader.ReadInt32();
@@ -104,6 +166,10 @@ public static class SaveManager
             }
         }       
     }
+
+    #endregion
+
+    #region Binary Serialization
 
     private static byte[] SerializeToBytes(object obj)
     {
@@ -125,6 +191,11 @@ public static class SaveManager
         return JsonUtility.FromJson(str, type);
     }
 
+    #endregion
+
+    #region Save Manager Settings Functions
+
+    // Save Manager Settings Functions
     public static void SetFilePath(string filePath)
     {
         saveFilePath = filePath;
@@ -132,6 +203,48 @@ public static class SaveManager
 
     public static void SetSaveType(SaveType type)
     {
-        _type = type;
+        saveType = type;
     }
+
+    #endregion
+
+    #region Debug Tool Function
+
+    // Debug Tool Functions
+    public static void PrintData(string key)
+    {
+        if(dataList.Count == 0)
+        {
+            ReadFile();
+        }
+
+        if(dataList.ContainsKey(key))
+        {
+            Debug.Log(dataList[key]);
+        }
+        else
+        {
+            Debug.LogError($"ERROR: {key} does not exist");
+        }
+    }
+
+    public static void PrintKeys()
+    {
+        foreach(var pair in dataList)
+        {
+            Debug.Log(pair.Key);
+        }
+    }
+
+    public static bool CheckKey(string key)
+    {
+        return dataList.ContainsKey(key);
+    }
+
+    public static SaveType getSaveType()
+    {
+        return saveType;
+    }
+
+    #endregion
 }

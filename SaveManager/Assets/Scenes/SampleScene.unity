@@ -150,6 +150,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SaveTest
   playerName: Test
   health: 100
+  position: {x: 1, y: 1, z: 1}
+  test: 2
 --- !u!4 &190496272
 Transform:
   m_ObjectHideFlags: 0
