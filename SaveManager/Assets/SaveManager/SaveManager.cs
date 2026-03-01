@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using Unity.VisualScripting;
 using UnityEngine;
-using static UnityEngine.Analytics.IAnalytic;
 
 public enum SaveType
 {
@@ -39,9 +41,11 @@ public static class SaveManager
 
     #region Data Functions
 
-    public static void Save<T>(string key, T data)
+    public static void Save<T>(string key, T data, SaveFile file = null)
     {
-        if(activeFile == null)
+        SaveFile fileInUse = file != null ? file : activeFile;
+
+        if(fileInUse == activeFile && fileInUse == null)
         {
             Debug.LogError($"ERROR: There is no active file");
             return;
@@ -53,31 +57,30 @@ public static class SaveManager
             return;
         }
 
-        Debug.Log(activeFile.getName());
-        Debug.Log(key);
-
-        if (activeFile.getDataList().ContainsKey(key))
+        if (fileInUse.getDataList().ContainsKey(key))
         {
             Debug.LogWarning($"Warning: Key: {key} has already been used. Overwriting data");
         }
 
-        activeFile.getDataList()[key] = data;
+        fileInUse.getDataList()[key] = data;
     }
 
-    public static T Load<T>(string key)
+    public static T Load<T>(string key, SaveFile file = null)
     {
-        if (activeFile == null)
+        SaveFile fileInUse = file != null ? file : activeFile;
+
+        if (fileInUse == activeFile && fileInUse == null)
         {
             Debug.LogError($"ERROR: There is no active file");
             return default;
         }
 
-        if (activeFile.getDataList().Count == 0)
+        if (fileInUse.getDataList().Count == 0)
         {
-            ReadFile();
+            ReadFile(fileInUse);
         }
 
-        if (activeFile.getDataList().TryGetValue(key, out var value))
+        if (fileInUse.getDataList().TryGetValue(key, out var value))
         {
             if(value is T typedValue)
             {
@@ -139,17 +142,17 @@ public static class SaveManager
         }            
     }
 
-    private static void ReadFile()
+    private static void ReadFile(SaveFile file)
     {
-        if (!File.Exists(activeFile.getFilePath()))
+        if (!File.Exists(file.getFilePath()))
         {
             Debug.Log("ERROR: No file set to read from");
             return;
         }
 
-        activeFile.getDataList().Clear();
+        file.getDataList().Clear();
 
-        using (FileStream fileStream = new(activeFile.getFilePath(), FileMode.Open))
+        using (FileStream fileStream = new(file.getFilePath(), FileMode.Open))
         using (BinaryReader reader = new(fileStream))
         {
             int count = reader.ReadInt32();
@@ -165,7 +168,7 @@ public static class SaveManager
                 Type type = Type.GetType(typeName);
                 object obj = DeserializeFromBytes(bytes, type);
 
-                activeFile.getDataList().Add(key, obj);
+                file.getDataList().Add(key, obj);
             }
         }       
     }
@@ -209,21 +212,90 @@ public static class SaveManager
         saveType = type;
     }
 
+    #region Auto Save
+
+    private static bool autoSave = false;
+    private static bool autoSaveRunning = false;
+    private static float autoSaveDelay = 60.0f;
+
+    private static CancellationTokenSource autoSaveCTS;
+
+    private static async Task AutoSave(CancellationToken token)
+    {
+        autoSaveRunning = true;
+
+        try
+        {
+            while (!autoSaveCTS.IsCancellationRequested)
+            {
+                await Task.Delay((int)(autoSaveDelay * 1000.0f), token);
+
+                foreach (var file in files)
+                {
+                    WriteToFile(file);
+                }
+
+                Debug.Log("Saved Files");
+            }
+        }
+        catch (TaskCanceledException) { }
+
+        autoSaveRunning = false;
+    }
+
+    public static void ToggleAutoSave()
+    {
+        autoSave = !autoSave;
+
+        Debug.Log(autoSave ? "Auto Save Turned On!" : "Auto Save Turned Off!");
+
+        if (autoSave)
+        {
+            if (autoSaveRunning) return;
+
+            autoSaveCTS = new CancellationTokenSource();
+            _ = AutoSave(autoSaveCTS.Token);
+        }
+        else
+        {
+            autoSaveCTS?.Cancel();
+        }
+    }
+
+    public static void SetAutoSaveDelay(float delay)
+    {
+        autoSaveDelay = delay;
+    }
+
+    public static void GetAutoSaveDelay()
+    {
+        Debug.Log($"Auto Save Delay: {autoSaveDelay} seconds");
+    }
+
+    #endregion
+
     #endregion
 
     #region Debug Tool Function
 
     // Debug Tool Functions
-    public static void PrintData(string key)
+    public static void PrintData(string key, SaveFile file = null)
     {
-        if(activeFile.getDataList().Count == 0)
+        SaveFile fileInUse = file != null ? file : activeFile;
+
+        if (fileInUse == null)
         {
-            ReadFile();
+            Debug.LogError($"ERROR: {fileInUse} does not exist");
         }
 
-        if(activeFile.getDataList().ContainsKey(key))
+        if (fileInUse.getDataList().Count == 0)
         {
-            Debug.Log($"Key: {key} Data: {activeFile.getDataList()[key]}");
+            ReadFile(fileInUse);
+        }
+
+        if(fileInUse.getDataList().ContainsKey(key))
+        {
+            Debug.Log($"Key: {key} Data: {fileInUse.getDataList()[key]}");
         }
         else
         {
@@ -231,17 +303,31 @@ public static class SaveManager
         }
     }
 
-    public static void PrintKeys()
+    public static void PrintKeys(SaveFile file = null)
     {
-        foreach(var pair in activeFile.getDataList())
+        SaveFile fileInUse = file != null ? file : activeFile;
+
+        if (fileInUse == null)
+        {
+            Debug.LogError($"ERROR: {fileInUse} does not exist");
+        }
+
+        foreach (var pair in fileInUse.getDataList())
         {
             Debug.Log(pair.Key);
         }
     }
 
-    public static bool CheckKey(string key)
+    public static bool CheckKey(string key, SaveFile file = null)
     {
-        return activeFile.getDataList().ContainsKey(key);
+        SaveFile fileInUse = file != null ? file : activeFile;
+
+        if (fileInUse == null)
+        {
+            Debug.LogError($"ERROR: {fileInUse} does not exist");
+        }
+
+        return fileInUse.getDataList().ContainsKey(key);
     }
 
     public static SaveType getSaveType()

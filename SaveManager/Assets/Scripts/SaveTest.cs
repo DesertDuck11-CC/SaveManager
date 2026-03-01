@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -67,16 +68,24 @@ public class SaveTest : MonoBehaviour
         Test newTest = SaveManager.Load<Test>("Test");
         SaveData newData2 = SaveManager.Load<SaveData>("SaveData");
 
+        SaveData newData3 = SaveManager.Load<SaveData>("SaveData", file);
+
         // Log all new variable data
         Debug.Log(newTest);
         Debug.Log(newData2.playerName);
         Debug.Log(newData2.health);
         Debug.Log(newData2.position);
+        Debug.Log(newData3.playerName);
+        Debug.Log(newData3.health);
+        Debug.Log(newData3.position);
 
         // Show Debug functions
         SaveManager.PrintData("Test");
         SaveManager.PrintKeys();
         Debug.Log(SaveManager.CheckKey("health"));
+
+        SaveManager.ToggleAutoSave();
+        SaveManager.GetAutoSaveDelay();
     }
 
     [System.Serializable]
