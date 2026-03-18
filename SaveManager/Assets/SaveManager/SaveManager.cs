@@ -216,7 +216,11 @@ public static class SaveManager
 
     private static bool autoSave = false;
     private static bool autoSaveRunning = false;
-    private static float autoSaveDelay = 60.0f;
+
+    /// <summary>
+    /// Delay between auto-saves in seconds
+    /// </summary>
+    public static float autoSaveDelay = 60.0f;
 
     private static CancellationTokenSource autoSaveCTS;
 
@@ -235,7 +239,7 @@ public static class SaveManager
                     WriteToFile(file);
                 }
 
-                Debug.Log("Saved Files");
+                Debug.Log("Auto-Save: Saved Files");
             }
         }
         catch (TaskCanceledException) { }
@@ -260,16 +264,6 @@ public static class SaveManager
         {
             autoSaveCTS?.Cancel();
         }
-    }
-
-    public static void SetAutoSaveDelay(float delay)
-    {
-        autoSaveDelay = delay;
-    }
-
-    public static void GetAutoSaveDelay()
-    {
-        Debug.Log($"Auto Save Delay: {autoSaveDelay} seconds");
     }
 
     #endregion

@@ -84,8 +84,10 @@ public class SaveTest : MonoBehaviour
         SaveManager.PrintKeys();
         Debug.Log(SaveManager.CheckKey("health"));
 
+        Debug.Log(SaveManager.autoSaveDelay);
+        SaveManager.autoSaveDelay = 10;
+        Debug.Log(SaveManager.autoSaveDelay);
         SaveManager.ToggleAutoSave();
-        SaveManager.GetAutoSaveDelay();
     }
 
     [System.Serializable]
