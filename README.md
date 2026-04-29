@@ -14,6 +14,7 @@ Feature List:
 Example:
 
 <pre>
+<code>
 public class SaveTest : MonoBehaviour
 {
     public enum Test
@@ -123,4 +124,5 @@ public class SaveTest : MonoBehaviour
         }
     }
 }
+</code>
 </pre>
