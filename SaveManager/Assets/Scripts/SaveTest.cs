@@ -1,6 +1,6 @@
-using System.Collections;
 using UnityEngine;
-using UnityEngine.SceneManagement;
+using TMPro;
+using System.Collections;
 
 public class SaveTest : MonoBehaviour
 {
@@ -10,6 +10,8 @@ public class SaveTest : MonoBehaviour
         One,
         Two
     }
+
+    public TMP_Text consoleText;
 
     public string playerName;
     public float health;
@@ -21,6 +23,14 @@ public class SaveTest : MonoBehaviour
 
     private void Start()
     {
+        SaveManager.consoleText = consoleText;
+
+        SaveManager.ToggleSaveWarning();
+
+        StartCoroutine(TestSaveManager());
+
+        return;
+
         testArray[0,0] = 0;
         testArray[1,1] = 1;
         testArray[2,2] = 2;
@@ -88,6 +98,76 @@ public class SaveTest : MonoBehaviour
         SaveManager.autoSaveDelay = 10;
         Debug.Log(SaveManager.autoSaveDelay);
         SaveManager.ToggleAutoSave();
+    }
+
+    private IEnumerator TestSaveManager()
+    {
+        testArray[0, 0] = 0;
+        testArray[1, 1] = 1;
+        testArray[2, 2] = 2;
+
+        // Create some data to save
+        SaveData saveData = new SaveData(playerName, health, position);
+
+        SaveFile file = SaveManager.CreateFile("save");
+        yield return new WaitForSeconds(0.1f);
+        SaveManager.SetFile(file);
+        yield return new WaitForSeconds(0.1f);
+
+        // Save the data to 1st file
+        SaveManager.Save("SaveData", saveData);
+        yield return new WaitForSeconds(0.1f);
+        SaveManager.Save("health", 20.0f);
+        yield return new WaitForSeconds(0.1f);
+        SaveManager.Save("Array", testArray);
+        yield return new WaitForSeconds(0.1f);
+
+        // Show Overwriting Data
+        SaveManager.Save("SaveData", saveData);
+        yield return new WaitForSeconds(0.1f);
+
+        // Create new empty data then give it information based on the saved data
+        SaveData newData = SaveManager.Load<SaveData>("SaveData");
+        yield return new WaitForSeconds(0.1f);
+        int newHealth = (int)SaveManager.Load<float>("health");
+        yield return new WaitForSeconds(0.1f);
+        int[,] newArray = SaveManager.Load<int[,]>("Array");
+        yield return new WaitForSeconds(0.1f);
+
+        // Multiple save files
+        SaveFile file2 = SaveManager.CreateFile("save2");
+        yield return new WaitForSeconds(0.1f);
+        SaveManager.SetFile(file2);
+        yield return new WaitForSeconds(0.1f);
+
+        // Save data to 2nd file
+        SaveManager.Save("Test", test);
+        yield return new WaitForSeconds(0.1f);
+
+        // Show that same key can be used in multiple files
+        SaveManager.Save("SaveData", saveData);
+        yield return new WaitForSeconds(0.1f);
+
+        // File 2 new data
+        Test newTest = SaveManager.Load<Test>("Test");
+        yield return new WaitForSeconds(0.1f);
+        SaveData newData2 = SaveManager.Load<SaveData>("SaveData");
+        yield return new WaitForSeconds(0.1f);
+
+        SaveData newData3 = SaveManager.Load<SaveData>("SaveData", file);
+        yield return new WaitForSeconds(0.1f);
+
+        // Log all new variable data
+
+        // Show Debug functions
+        SaveManager.PrintData("Test");
+        yield return new WaitForSeconds(0.1f);
+        SaveManager.PrintKeys();
+        yield return new WaitForSeconds(0.1f);
+
+        SaveManager.autoSaveDelay = 10;
+        SaveManager.ToggleAutoSave();
+        yield return new WaitForSeconds(0.1f);
     }
 
     [System.Serializable]

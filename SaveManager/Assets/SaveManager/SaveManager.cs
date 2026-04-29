@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Unity.VisualScripting;
+using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public enum SaveType
 {
@@ -21,6 +22,8 @@ public static class SaveManager
     public static List<SaveFile> files = new List<SaveFile>();
     public static SaveFile activeFile = null;
 
+    public static TMP_Text consoleText;
+
     #region File Write On Quit
 
     [RuntimeInitializeOnLoadMethod]
@@ -35,6 +38,11 @@ public static class SaveManager
         {
             WriteToFile(file);
         }
+
+        if(autoSave)
+        {
+            ToggleAutoSave();
+        }
     }
 
     #endregion
@@ -45,22 +53,31 @@ public static class SaveManager
     {
         SaveFile fileInUse = file != null ? file : activeFile;
 
-        if(fileInUse == activeFile && fileInUse == null)
+        if (fileInUse == activeFile && fileInUse == null)
         {
             Debug.LogError($"ERROR: There is no active file");
+            if (consoleText != null) consoleText.text += $"ERROR: There is no active file\n";
             return;
         }
 
         if (data == null)
         {
             Debug.LogError($"ERROR: {data} is set to null");
+            if (consoleText != null) consoleText.text += $"ERROR: {data} is set to null\n";
             return;
         }
 
-        if (fileInUse.getDataList().ContainsKey(key))
+        if (saveWarning)
         {
-            Debug.LogWarning($"Warning: Key: {key} has already been used. Overwriting data");
+            if (fileInUse.getDataList().ContainsKey(key))
+            {
+                Debug.LogWarning($"Warning: Key: {key} has already been used. Overwriting data");
+
+                if (consoleText != null) consoleText.text += $"Warning: Key: {key} has already been used. Overwriting data\n";
+            }
         }
+
+        if (consoleText != null) consoleText.text += $"Saving {data.GetType()} to '{key}' in {fileInUse.getName()}\n";
 
         fileInUse.getDataList()[key] = data;
     }
@@ -72,6 +89,9 @@ public static class SaveManager
         if (fileInUse == activeFile && fileInUse == null)
         {
             Debug.LogError($"ERROR: There is no active file");
+
+            if (consoleText != null) consoleText.text += $"ERROR: There is no active file\n";
+
             return default;
         }
 
@@ -82,13 +102,18 @@ public static class SaveManager
 
         if (fileInUse.getDataList().TryGetValue(key, out var value))
         {
-            if(value is T typedValue)
+            if (value is T typedValue)
             {
+                if (consoleText != null) consoleText.text += $"Loaded {typeof(T)} from '{key}' in {fileInUse.getName()}\n";
+
                 return typedValue;
-            }       
+            }
         }
-        
+
         Debug.LogError($"ERROR: Variable not found for {key}");
+
+        if (consoleText != null) consoleText.text += $"ERROR: Variable not found for {key}\n";
+
         return default;
     }
 
@@ -102,6 +127,8 @@ public static class SaveManager
 
         files.Add(file);
 
+        if(consoleText != null) consoleText.text += $"New File Created: {fileName}\n";
+
         return file;
     }
 
@@ -110,9 +137,13 @@ public static class SaveManager
         if (!files.Contains(file))
         {
             files.Add(file);
-        }        
+        }
+
+        if (consoleText != null) consoleText.text += $"File Set to {file.getName()}\n";
 
         activeFile = file;
+
+        ReadFile(file);
     }
 
     private static void WriteToFile(SaveFile file)
@@ -120,26 +151,23 @@ public static class SaveManager
         if (file == null)
         {
             Debug.Log("ERROR: File does not exist");
+            if (consoleText != null) consoleText.text += "ERROR: File does not exist\n";
             return;
         }
 
-        using (FileStream fileStream = new(file.getFilePath(), FileMode.Create))
-        using (BinaryWriter writer = new(fileStream))
+        using FileStream fileStream = new(file.getFilePath(), FileMode.Create);
+        using BinaryWriter writer = new(fileStream);
+
+        var data = file.getDataList();
+
+        writer.Write(data.Count);
+
+        foreach (var pair in data)
         {
-            writer.Write(file.getDataList().Count);
+            writer.Write(pair.Key);
 
-            foreach (var pair in file.getDataList())
-            {
-                writer.Write(pair.Key);
-
-                Type type = pair.Value.GetType();
-                writer.Write(type.AssemblyQualifiedName);
-
-                byte[] bytes = SerializeToBytes(pair.Value);
-                writer.Write(bytes.Length);
-                writer.Write(bytes);
-            }
-        }            
+            BinarySerializer.WriteObject(writer, pair.Value);
+        }
     }
 
     private static void ReadFile(SaveFile file)
@@ -147,54 +175,24 @@ public static class SaveManager
         if (!File.Exists(file.getFilePath()))
         {
             Debug.Log("ERROR: No file set to read from");
+            if (consoleText != null) consoleText.text += "ERROR: No file set to read from\n";
             return;
         }
 
         file.getDataList().Clear();
 
-        using (FileStream fileStream = new(file.getFilePath(), FileMode.Open))
-        using (BinaryReader reader = new(fileStream))
+        using FileStream fileStream = new(file.getFilePath(), FileMode.Open);
+        using BinaryReader reader = new(fileStream);
+
+        int count = reader.ReadInt32();
+
+        for (int i = 0; i < count; i++)
         {
-            int count = reader.ReadInt32();
+            string key = reader.ReadString();
+            object value = BinarySerializer.ReadObject(reader);
 
-            for (int i = 0; i < count; i++)
-            {
-                string key = reader.ReadString();
-                string typeName = reader.ReadString();
-
-                int length = reader.ReadInt32();
-                byte[] bytes = reader.ReadBytes(length);
-
-                Type type = Type.GetType(typeName);
-                object obj = DeserializeFromBytes(bytes, type);
-
-                file.getDataList().Add(key, obj);
-            }
-        }       
-    }
-
-    #endregion
-
-    #region Binary Serialization
-
-    private static byte[] SerializeToBytes(object obj)
-    {
-        if(obj.GetType().IsPrimitive || obj is string)
-        {
-            return System.Text.Encoding.UTF8.GetBytes(obj.ToString());
+            file.getDataList()[key] = value;
         }
-        string json = JsonUtility.ToJson(obj);
-        return System.Text.Encoding.UTF8.GetBytes(json);
-    }
-
-    private static object DeserializeFromBytes(byte[] data, Type type)
-    {
-        string str = System.Text.Encoding.UTF8.GetString(data);
-        if (type.IsPrimitive || type == typeof(string))
-        {
-            return Convert.ChangeType(str, type);
-        }
-        return JsonUtility.FromJson(str, type);
     }
 
     #endregion
@@ -205,11 +203,23 @@ public static class SaveManager
     public static void SetFilePath(string filePath)
     {
         saveFilePath = filePath;
+
+        if (consoleText != null) consoleText.text += $"File path set to {filePath}\n";
     }
 
     public static void SetSaveType(SaveType type)
     {
         saveType = type;
+
+        if (consoleText != null) consoleText.text += $"Save type set to {type}\n";
+    }
+
+    static bool saveWarning = false;
+    public static void ToggleSaveWarning()
+    {
+        saveWarning = !saveWarning;
+
+        if (consoleText != null) consoleText.text += $"Save warning set to {saveWarning}\n";
     }
 
     #region Auto Save
@@ -240,6 +250,7 @@ public static class SaveManager
                 }
 
                 Debug.Log("Auto-Save: Saved Files");
+                if (consoleText != null) consoleText.text += "Auto-Save: Saved Files\n";
             }
         }
         catch (TaskCanceledException) { }
@@ -252,6 +263,7 @@ public static class SaveManager
         autoSave = !autoSave;
 
         Debug.Log(autoSave ? "Auto Save Turned On!" : "Auto Save Turned Off!");
+        if (consoleText != null) consoleText.text += autoSave ? "Auto Save Turned On!\n" : "Auto Save Turned Off!\n";
 
         if (autoSave)
         {
@@ -280,6 +292,7 @@ public static class SaveManager
         if (fileInUse == null)
         {
             Debug.LogError($"ERROR: {fileInUse} does not exist");
+            if (consoleText != null) consoleText.text += $"ERROR: {fileInUse} does not exist\n";
         }
 
         if (fileInUse.getDataList().Count == 0)
@@ -287,13 +300,15 @@ public static class SaveManager
             ReadFile(fileInUse);
         }
 
-        if(fileInUse.getDataList().ContainsKey(key))
+        if (fileInUse.getDataList().ContainsKey(key))
         {
             Debug.Log($"Key: {key} Data: {fileInUse.getDataList()[key]}");
+            if (consoleText != null) consoleText.text += $"Key: {key} Data: {fileInUse.getDataList()[key]}\n";
         }
         else
         {
             Debug.LogError($"ERROR: {key} does not exist");
+            if (consoleText != null) consoleText.text += $"ERROR: {key} does not exist\n";
         }
     }
 
@@ -304,6 +319,7 @@ public static class SaveManager
         if (fileInUse == null)
         {
             Debug.LogError($"ERROR: {fileInUse} does not exist");
+            if (consoleText != null) consoleText.text += $"ERROR: {fileInUse} does not exist\n";
         }
 
         foreach (var pair in fileInUse.getDataList())
@@ -319,6 +335,7 @@ public static class SaveManager
         if (fileInUse == null)
         {
             Debug.LogError($"ERROR: {fileInUse} does not exist");
+            if (consoleText != null) consoleText.text += $"ERROR: {fileInUse} does not exist\n";
         }
 
         return fileInUse.getDataList().ContainsKey(key);
