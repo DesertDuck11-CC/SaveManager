@@ -9,7 +9,7 @@ Feature List:
 - Load data
 - Auto-save
 - Multiple debug functions
-- Ability to have a set console
+- Ability to have an on-screen console
 
 Example:
 
