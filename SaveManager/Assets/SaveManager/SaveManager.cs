@@ -77,7 +77,7 @@ public static class SaveManager
             }
         }
 
-        if (consoleText != null) consoleText.text += $"Saving {data.GetType()} to '{key}' in {fileInUse.getName()}\n";
+        if (consoleText != null) consoleText.text += $"Saving {data.GetType().Name}: {data} to '{key}' in {fileInUse.getName()}\n";
 
         fileInUse.getDataList()[key] = data;
     }
@@ -104,7 +104,7 @@ public static class SaveManager
         {
             if (value is T typedValue)
             {
-                if (consoleText != null) consoleText.text += $"Loaded {typeof(T)} from '{key}' in {fileInUse.getName()}\n";
+                if (consoleText != null) consoleText.text += $"Loaded {typeof(T).Name}: {typedValue} from '{key}' in {fileInUse.getName()}\n";
 
                 return typedValue;
             }
