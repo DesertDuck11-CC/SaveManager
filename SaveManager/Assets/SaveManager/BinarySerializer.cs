@@ -60,10 +60,20 @@ public static class BinarySerializer
         {
             Array arr = (Array)obj;
 
-            writer.Write((byte)TypeCode.Array);
-            writer.Write(arr.Rank); // supports int[,] etc
-            writer.Write(arr.Length);
+            writer.Write(type.GetElementType().AssemblyQualifiedName);
 
+            writer.Write((byte)TypeCode.Array);
+
+            int rank = arr.Rank;
+            writer.Write(rank);
+
+            // Write dimensions of array
+            for (int d = 0; d < rank; d++)
+            {
+                writer.Write(arr.GetLength(d));
+            }
+
+            // Write all elements in linear order
             foreach (var item in arr)
             {
                 WriteObject(writer, item);
@@ -117,15 +127,41 @@ public static class BinarySerializer
                 );
 
             case TypeCode.Array:
+                string elementTypeName = reader.ReadString();
+                Type elementType = Type.GetType(elementTypeName);
+
                 int rank = reader.ReadInt32();
-                int length = reader.ReadInt32();
 
-                object[] temp = new object[length];
+                int[] lengths = new int[rank];
+                int totalLength = 1;
 
-                for (int i = 0; i < length; i++)
-                    temp[i] = ReadObject(reader);
+                for (int i = 0; i < rank; i++)
+                {
+                    lengths[i] = reader.ReadInt32();
+                    totalLength *= lengths[i];
+                }
 
-                return temp; // (we’ll fix shaping next)
+                // Read flat values
+                object[] flat = new object[totalLength];
+
+                for (int i = 0; i < totalLength; i++)
+                {
+                    flat[i] = ReadObject(reader);
+                }
+
+                // Rebuild array using reflection
+                Array arr = Array.CreateInstance(elementType, lengths);
+
+                // Fill using indices
+                int[] indices = new int[rank];
+
+                for (int i = 0; i < totalLength; i++)
+                {
+                    GetIndices(i, lengths, indices);
+                    arr.SetValue(flat[i], indices);
+                }
+
+                return arr;
 
             case TypeCode.Object:
                 {
@@ -153,5 +189,14 @@ public static class BinarySerializer
         }
 
         return null;
+    }
+
+    private static void GetIndices(int flatIndex, int[] lengths, int[] indices)
+    {
+        for (int i = lengths.Length - 1; i >= 0; i--)
+        {
+            indices[i] = flatIndex % lengths[i];
+            flatIndex /= lengths[i];
+        }
     }
 }
